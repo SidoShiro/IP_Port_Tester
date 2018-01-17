@@ -1,13 +1,13 @@
-#include "stdafx.h"
-#include <winsock2.h>
-#include <ws2tcpip.h>
+//#include "stdafx.h"
+//#include <winsock2.h>
+//#include <ws2tcpip.h>
 #include <stdio.h>
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <istream>
 #include <set>
-#include "Fonctions.h"
+#include "fonctions.h"
 #include <memory>
 
 using namespace std;
