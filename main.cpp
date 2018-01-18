@@ -15,6 +15,21 @@
 // Linux Threads
 #include <pthread.h>
 
+// Linux Sockets
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+
+// Errno
+#include <errno.h>
+#include <err.h>
+
+// Signals
+#include <signal.h>
+
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Kernel32.lib")
 
@@ -38,17 +53,14 @@ std::ofstream* fResultats = new std::ofstream();
 pthread_t *event;
 
 //DWORD WINAPI Thread1( LPVOID lpParameter )
-void pocess_ip(void *data)
+void *process_ip(void *data)
 {
   while (count < round) // std::char_traits<wchar_t>::eof()
   {
-    initialisationWinsock();
+    int coSockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (-1 == coSockfd) // Socket creation test
+      warnx("Error socket creation!");
 
-    SOCKET ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (INVALID_SOCKET == ConnectSocket) // Test de Connection
-    {
-      printf("Error at socket(): %ld\n", WSAGetLastError());
-    }
     int iResult = 0;
     char adresseIp[16];
 
@@ -60,29 +72,28 @@ void pocess_ip(void *data)
     recpHostInfo.sin_family = AF_INET;
     recpHostInfo.sin_addr.s_addr = inet_addr(adresseIp);
     recpHostInfo.sin_port = htons(DEFAULT_PORT);
-    iResult = connect(ConnectSocket, (sockaddr*) &recpHostInfo,
+    iResult = connect(coSockfd, (sockaddr*) &recpHostInfo,
       sizeof(recpHostInfo));
-    if (iResult == SOCKET_ERROR)
+    if (-1 == iResult)
     {
       pthread_mutex_lock(&criticalZ);
-      printf("Erreur pas de connection %ld !\n", WSAGetLastError());
-      WSACleanup();
+      warnx("Error no connection !");
+      // WSACleanup(); -> auto in Linux
       pthread_mutex_unlock(&criticalZ);
     }
-    if (iResult != SOCKET_ERROR)
+    if (iResult != -1)
     {
       pthread_mutex_lock(&criticalZ);
       printf("Connection etablie !\n");
       fResultats->write(adresseIp, 16);
       pthread_mutex_unlock(&criticalZ);
     }
-    ConnectSocket = INVALID_SOCKET;
-    closesocket(ConnectSocket);
+    close(coSockfd); // close fd socket
     count += 1;
   }
-  WSACleanup();
-  SetEvent(writeEvent);
-  return 0;
+  // WSACleanup(); -> auto on Linux
+  // SetEvent(writeEvent); FIXME Idk what is this !!! FIXME
+  return NULL;
 }
 
 
@@ -100,14 +111,15 @@ int main(int argc, char *argv[])
 		system("PAUSE");
 		return 9;
 	}
-  writeEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-
+  // writeEvent = CreateEvent(NULL, TRUE, FALSE, NULL); FIXME convert to LINUX
+  /*
   if (writeEvent == NULL)
   {
     printf("Echec de l'event erreur : (%d)\n", GetLastError());
     return 1;
   }
-  DWORD threadID[MAX_THREADS];
+  */
+
   cout << " ";
   cout << MAX_THREADS;
   cout << " Thread(s) activated" << endl << endl;
@@ -121,7 +133,7 @@ int main(int argc, char *argv[])
     system("PAUSE");
     fRu->close();
     fResultats->close();
-    CloseHandle(writeEvent);
+    // CloseHandle(writeEvent); FIXME convert to Linux !
     return 0;
   }
 
@@ -138,22 +150,22 @@ int main(int argc, char *argv[])
   // mutex attr can be estroyed
   pthread_mutexattr_destroy(&mA);
 
-  fResultats->open("C:\\Users\\Marc\\Desktop\\RU\\fResultats.txt");
-  fRu->open("C:\\Users\\Marc\\Desktop\\RU\\RU.dat");
+  fResultats->open("fResultats");
+  fRu->open("RU");
   if ( fRu->fail() )
   {
     std::cout << "Erreur ouverture incorrecte !"  << endl;
   }
 
-  for (int relanceThread = 0; relanceThread < MAX_THREADS; relanceThread++)
-  {
-    CreateThread(NULL, 0, Thread1, NULL, 0, &threadID[relanceThread]);
-  }
+  pthread_t *threadsTable = (pthread_t*)malloc(MAX_THREADS * sizeof(pthread_t));
+  for (int i = 0; i < MAX_THREADS; i++)
+    pthread_create(&threadsTable[i], NULL, process_ip, NULL);
 
-  DWORD attendreResultat;
+  int attendreResultat;
 
-  attendreResultat = WaitForSingleObject(writeEvent, INFINITE);
+  // attendreResultat = WaitForSingleObject(writeEvent, INFINITE);
 
+  /* FIXME !!!
   switch (attendreResultat)
   {
     case WAIT_OBJECT_0:
@@ -162,11 +174,12 @@ int main(int argc, char *argv[])
       printf("Erreur prob : (%d)\n", GetLastError());
       return 0;
   }
+  */
 
   fRu->close();
   fResultats->close();
-  CloseHandle(writeEvent);
-  attendreResultat = WaitForSingleObject(writeEvent, INFINITE);
+  // CloseHandle(writeEvent); FIXME convert to Linux
+  // attendreResultat = WaitForSingleObject(writeEvent, INFINITE);
   cout << endl << "Process ended well !" << endl << endl;
   char k;
   cin >> k;
