@@ -2,11 +2,11 @@
 //#include <ws2tcpip.h>
 //#include <Mswsock.h>
 #include <stdio.h>
-#include <string>
+#include <stdlib.h>
+#include <string.h>
 #include <iostream>
 #include <fstream>
 #include "fonctions.h"
-#include <memory>
 //#include <windows.h>
 //#include <tchar.h>
 //#include <strsafe.h>
@@ -33,9 +33,9 @@
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Kernel32.lib")
 
-const unsigned int MAX_THREADS = 1500;
+unsigned int MAX_THREADS = 8;
 
-const unsigned short DEFAULT_PORT = 80;
+unsigned short DEFAULT_PORT = 80;
 
 int count = 0;
 
@@ -59,7 +59,7 @@ void *process_ip(void *data)
   {
     int coSockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (-1 == coSockfd) // Socket creation test
-      warnx("Error socket creation!");
+      warnx("Error socket creation! %s ", strerror(errno));
 
     int iResult = 0;
     char adresseIp[16];
@@ -77,7 +77,7 @@ void *process_ip(void *data)
     if (-1 == iResult)
     {
       pthread_mutex_lock(&criticalZ);
-      warnx("Error no connection !");
+      warnx("Error no connection ! %s", strerror(errno));
       // WSACleanup(); -> auto in Linux
       pthread_mutex_unlock(&criticalZ);
     }
@@ -96,21 +96,25 @@ void *process_ip(void *data)
   return NULL;
 }
 
-
-
 int main(int argc, char *argv[])
 {
-	//system("TITLE Chercheur Ip Serveur");
-	//system("COLOR 0A");
-	char test01 = 0;
-	cout << "  Port test : " << DEFAULT_PORT << endl;
-	cout << endl;
-	if(0 == argc)
-	{
-		printf("Erreur parametre en trop.\n");
-		system("PAUSE");
-		return 9;
-	}
+	system("TITLE IP_Port_Tester");
+	system("COLOR 0A");
+  char *user = (char*)malloc(sizeof(char) * 81);
+  cout << " Enter PORT ?\n";
+  cin >> user;
+  int port_test = 80;
+  try
+  {
+    port_test = atoi(user);
+  }
+  catch (const exception e)
+  {
+    cout << " Error input\n";
+  }
+  DEFAULT_PORT = port_test;
+	cout << "  Port test : " << DEFAULT_PORT << "\n";
+
   // writeEvent = CreateEvent(NULL, TRUE, FALSE, NULL); FIXME convert to LINUX
   /*
   if (writeEvent == NULL)
@@ -119,27 +123,37 @@ int main(int argc, char *argv[])
     return 1;
   }
   */
-
-  cout << " ";
-  cout << MAX_THREADS;
-  cout << " Thread(s) activated" << endl << endl;
-  cout << " Beggin Process (y/n)" << endl << endl;
-  cin >> test01;
-  cout << endl;
-
-  if (test01 != 'y')
+  cout << " How many threads do you want ?\n";
+  free(user);
+  user = (char*)malloc(sizeof(char) * 81);
+  cin >> user;
+  int max_thr = 80;
+  try
+  {
+    max_thr = atoi(user);
+  }
+  catch (const exception e)
+  {
+    cout << " Error input\n";
+  }
+  MAX_THREADS = max_thr;
+  cout << " " << MAX_THREADS << " Thread(s) activated\n";
+  cout << " Begin Process (y/n)\n";
+  free(user);
+  user = (char*)malloc(sizeof(char) * 81);
+  cin >> user;
+  if ('y' != user[0])
   {
     cout << "Process cancelled..." << endl;
-    system("PAUSE");
     fRu->close();
     fResultats->close();
     // CloseHandle(writeEvent); FIXME convert to Linux !
+    free(user);
     return 0;
   }
-
+  free(user);
   cout << " How many IPs on test ? (10000 x) if max (30000) " << endl << endl;
   cin >> round;
-
   // InitializeCriticalSection(zoneCritique); // pointeur objet
   // create mutex attr var
   pthread_mutexattr_t mA;
@@ -151,15 +165,17 @@ int main(int argc, char *argv[])
   pthread_mutexattr_destroy(&mA);
 
   fResultats->open("fResultats");
-  fRu->open("RU");
+  fRu->open("fEntry");
   if ( fRu->fail() )
-  {
-    std::cout << "Erreur ouverture incorrecte !"  << endl;
-  }
+    cout << "Erreur ouverture incorrecte !\n";
 
+/*
   pthread_t *threadsTable = (pthread_t*)malloc(MAX_THREADS * sizeof(pthread_t));
   for (int i = 0; i < MAX_THREADS; i++)
     pthread_create(&threadsTable[i], NULL, process_ip, NULL);
+*/
+
+  process_ip(NULL); // HERE ALL the MAGIC !!!
 
   int attendreResultat;
 
@@ -176,14 +192,12 @@ int main(int argc, char *argv[])
   }
   */
 
+  sleep(100000);
   fRu->close();
   fResultats->close();
   // CloseHandle(writeEvent); FIXME convert to Linux
   // attendreResultat = WaitForSingleObject(writeEvent, INFINITE);
-  cout << endl << "Process ended well !" << endl << endl;
-  char k;
-  cin >> k;
+  cout << "Process ended well !\n";
   pthread_mutex_destroy(&criticalZ);
-  system("PAUSE");
   return 0;
 }
