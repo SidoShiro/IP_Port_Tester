@@ -14,8 +14,6 @@ This was my first longest program on a hard subject
 
 Stuff todo :
 
- [checkbox:unchecked] Add Tests
-
- [checkbox:unchecked] Imporve the app, customize the IP packet
- 
- [checkbox:unchecked] Fix, make the code cleaner, add comments
+* [ ] Add Tests
+* [ ] Imporve the app, customize the IP packet
+* [ ] Fix, make the code cleaner, add comments
