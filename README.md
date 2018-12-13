@@ -16,4 +16,4 @@ Stuff todo :
 
 * [ ] Add Tests
 * [ ] Imporve the app, customize the IP packet
-* [ ] Fix, make the code cleaner, add comments
+* [X] Fix, make the code cleaner, add comments
