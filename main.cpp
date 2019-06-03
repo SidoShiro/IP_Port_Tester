@@ -46,15 +46,57 @@ using namespace std;
 // CRITICAL_SECTION* zoneCritique = new CRITICAL_SECTION();
 pthread_mutex_t criticalZ;
 
-std::ifstream* fRu = new std::ifstream();
-std::ofstream* fResultats = new std::ofstream();
+std::ifstream *fRu = new std::ifstream();
+std::ofstream *fResultats = new std::ofstream();
 
 // HANDLE writeEvent;
 pthread_t *event;
 
+bool process_ip_user(char *ip) {
+  int coSockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  bool res = false;
+
+  if (-1 == coSockfd) // Socket creation test
+    warnx("Error socket creation! %s ", strerror(errno));
+
+  int iResult = 0;
+  char adresseIp[16];
+  // FIXME dirty
+  for (int i = 0; i < 16; i++) {
+    adresseIp[i] = ip[i];
+  }
+
+  struct sockaddr_in recpHostInfo;
+  recpHostInfo.sin_family = AF_INET;
+  recpHostInfo.sin_addr.s_addr = inet_addr(adresseIp);
+  recpHostInfo.sin_port = htons(DEFAULT_PORT);
+  /*
+  iResult = connect(coSockfd, (sockaddr * ) & recpHostInfo,
+                    sizeof(recpHostInfo));
+  */
+
+  /* Establish connection */
+  if (connect(coSockfd,
+              (struct sockaddr *) &recpHostInfo,
+              sizeof(recpHostInfo)) < 0) {
+    pthread_mutex_lock(&criticalZ);
+    warnx("Error no connection (%s) ! %s", adresseIp, strerror(errno));
+    // WSACleanup(); -> auto in Linux
+    pthread_mutex_unlock(&criticalZ);
+  } else {
+    pthread_mutex_lock(&criticalZ);
+    printf("Connection établie avec %s !\n", adresseIp);
+    fResultats->write(adresseIp, 16);
+    pthread_mutex_unlock(&criticalZ);
+    res = true;
+  }
+
+  close(coSockfd); // close fd socket
+  return res;
+}
+
 //DWORD WINAPI Thread1( LPVOID lpParameter )
-void *process_ip(void *data)
-{
+void *process_ip(void *data) {
   while (count < round) // std::char_traits<wchar_t>::eof()
   {
     int coSockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -72,22 +114,26 @@ void *process_ip(void *data)
     recpHostInfo.sin_family = AF_INET;
     recpHostInfo.sin_addr.s_addr = inet_addr(adresseIp);
     recpHostInfo.sin_port = htons(DEFAULT_PORT);
-    iResult = connect(coSockfd, (sockaddr*) &recpHostInfo,
-      sizeof(recpHostInfo));
-    if (-1 == iResult)
-    {
+    /*
+    iResult = connect(coSockfd, (sockaddr * ) & recpHostInfo,
+                      sizeof(recpHostInfo));
+    */
+
+    /* Establish connection */
+    if (connect(coSockfd,
+                (struct sockaddr *) &recpHostInfo,
+                sizeof(recpHostInfo)) < 0) {
       pthread_mutex_lock(&criticalZ);
-      warnx("Error no connection ! %s", strerror(errno));
+      warnx("Error no connection (%s) ! %s", adresseIp, strerror(errno));
       // WSACleanup(); -> auto in Linux
       pthread_mutex_unlock(&criticalZ);
-    }
-    if (iResult != -1)
-    {
+    } else {
       pthread_mutex_lock(&criticalZ);
-      printf("Connection etablie !\n");
+      printf("Connection établie avec %s !\n", adresseIp);
       fResultats->write(adresseIp, 16);
       pthread_mutex_unlock(&criticalZ);
     }
+
     close(coSockfd); // close fd socket
     count += 1;
   }
@@ -96,24 +142,64 @@ void *process_ip(void *data)
   return NULL;
 }
 
-int main(int argc, char *argv[])
-{
-	system("TITLE IP_Port_Tester");
-	system("COLOR 0A");
-  char *user = (char*)malloc(sizeof(char) * 81);
+int main(int argc, char *argv[]) {
+  // Windows : system("TITLE IP_Port_Tester");
+  // Windows : system("COLOR 0A");
+  char *user = (char *) malloc(sizeof(char) * 81);
+
+  // Menu
+  cout << "File mode or Intractive mode ? (file or inter)\n";
+  cin >> user;
+  int mode_f = 0;
+  try {
+    if ("file" == user) {
+      mode_f = 1;
+    }
+  }
+  catch (const exception e) {
+    cerr << "Error user input " << user << "\n";
+  }
+
+  // Interactive Mode
+  if (mode_f == 0) {
+    cout << "==== INTERACTIVE MODE ====\n";
+    cout << " Enter PORT ?\n";
+    cin >> user;
+    int port_test = 80;
+    try {
+      port_test = atoi(user);
+    }
+    catch (const exception e) {
+      cout << " Error input\n";
+    }
+    DEFAULT_PORT = port_test;
+    cout << "  Port test : " << DEFAULT_PORT << "\n";
+    bool res;
+    while (true) {
+      cout << " Enter IP to test ?\n >";
+      cin >> user;
+      if (user == "quit" || user == "exit") {
+        break;
+      }
+      res = process_ip_user(user);
+    }
+    return 0;
+  }
+
+  // File Mode
+  cout << "==== FILE MODE ====\n";
+  cout << "Testing all IP addresses from fIPs file.\n";
   cout << " Enter PORT ?\n";
   cin >> user;
   int port_test = 80;
-  try
-  {
+  try {
     port_test = atoi(user);
   }
-  catch (const exception e)
-  {
+  catch (const exception e) {
     cout << " Error input\n";
   }
   DEFAULT_PORT = port_test;
-	cout << "  Port test : " << DEFAULT_PORT << "\n";
+  cout << "  Port test : " << DEFAULT_PORT << "\n";
 
   // writeEvent = CreateEvent(NULL, TRUE, FALSE, NULL); FIXME convert to LINUX
   /*
@@ -125,32 +211,18 @@ int main(int argc, char *argv[])
   */
   cout << " How many threads do you want ?\n";
   free(user);
-  user = (char*)malloc(sizeof(char) * 81);
+  user = (char *) malloc(sizeof(char) * 81);
   cin >> user;
   int max_thr = 80;
-  try
-  {
+  try {
     max_thr = atoi(user);
   }
-  catch (const exception e)
-  {
+  catch (const exception e) {
     cout << " Error input\n";
   }
   MAX_THREADS = max_thr;
   cout << " " << MAX_THREADS << " Thread(s) activated\n";
-  cout << " Begin Process (y/n)\n";
-  free(user);
-  user = (char*)malloc(sizeof(char) * 81);
-  cin >> user;
-  if ('y' != user[0])
-  {
-    cout << "Process cancelled..." << endl;
-    fRu->close();
-    fResultats->close();
-    // CloseHandle(writeEvent); FIXME convert to Linux !
-    free(user);
-    return 0;
-  }
+  // cout << " Begin Process (y/n)\n";
   free(user);
   cout << " How many IPs on test ? (10000 x) if max (30000) " << endl << endl;
   cin >> round;
@@ -164,16 +236,18 @@ int main(int argc, char *argv[])
   // mutex attr can be estroyed
   pthread_mutexattr_destroy(&mA);
 
-  fResultats->open("fResultats");
-  fRu->open("fEntry");
-  if ( fRu->fail() )
-    cout << "Erreur ouverture incorrecte !\n";
+  std::string fileRes = "fResultats"; // + port_test;
+  fResultats->open(fileRes);
+  fRu->open("fIPs");
+  if (fRu->fail())
+    cout << "Erreur ouverture incorrecte de fIPs !\n";
 
-/*
-  pthread_t *threadsTable = (pthread_t*)malloc(MAX_THREADS * sizeof(pthread_t));
+
+  pthread_t *threadsTable = (pthread_t *) malloc(
+    MAX_THREADS * sizeof(pthread_t));
   for (int i = 0; i < MAX_THREADS; i++)
     pthread_create(&threadsTable[i], NULL, process_ip, NULL);
-*/
+
 
   process_ip(NULL); // HERE ALL the MAGIC !!!
 
@@ -192,7 +266,7 @@ int main(int argc, char *argv[])
   }
   */
 
-  sleep(100000);
+  sleep(100000); // FIXME dirty
   fRu->close();
   fResultats->close();
   // CloseHandle(writeEvent); FIXME convert to Linux
